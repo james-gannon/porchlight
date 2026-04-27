@@ -1,0 +1,16 @@
+name = "porchlight-lead-intake"
+main = "src/index.ts"
+compatibility_date = "2026-04-01"
+compatibility_flags = ["nodejs_compat"]
+
+# Set with `wrangler secret put` — never check secrets into git.
+#   LEAD_WORKER_HMAC_SECRET   shared with the Next.js Edge route
+#   CLOSE_API_KEY             Close CRM API key
+#   CLOSE_LEAD_PIPELINE_ID    Close pipeline (optional)
+#   CLOSE_OWNER_USER_ID       Close user to assign new leads to (optional)
+#   TELEGRAM_BOT_TOKEN        bot token from @BotFather
+#   TELEGRAM_OWNER_CHAT_ID    chat id to ping for new leads
+#   TURNSTILE_SECRET_KEY      Cloudflare Turnstile server-side secret
+
+[observability]
+enabled = true

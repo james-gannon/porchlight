@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Fraunces, Inter } from "next/font/google";
 import { Header } from "@/components/layout/Header";
 import { Footer } from "@/components/layout/Footer";
+import { MobileStickyCTA } from "@/components/layout/MobileStickyCTA";
 import { site } from "@/content/site";
 import "./globals.css";
 
@@ -44,10 +45,11 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" className={`${fraunces.variable} ${inter.variable}`}>
-      <body className="font-sans">
+      <body className="font-sans pb-[72px] md:pb-0">
         <Header />
         <main id="main">{children}</main>
         <Footer />
+        <MobileStickyCTA />
       </body>
     </html>
   );

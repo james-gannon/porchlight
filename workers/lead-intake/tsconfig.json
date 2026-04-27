@@ -1,0 +1,21 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022"],
+    "module": "ES2022",
+    "moduleResolution": "bundler",
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "esModuleInterop": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "noEmit": true,
+    "skipLibCheck": true,
+    "types": ["@cloudflare/workers-types"],
+    "paths": {
+      "@porchlight/shared/*": ["../../lib/*"]
+    }
+  },
+  "include": ["src/**/*.ts", "../../lib/leadSchema.ts", "../../lib/hmac.ts"],
+  "exclude": ["node_modules"]
+}
