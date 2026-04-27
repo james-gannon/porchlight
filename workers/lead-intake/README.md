@@ -2,24 +2,45 @@
 
 Receives lead submissions from the Next.js app at `/api/lead`, verifies the HMAC
 signature, validates the payload against the shared Zod schema in
-`lib/leadSchema.ts`, then pushes:
+`lib/leadSchema.ts`, then:
 
-1. **Close CRM** — creates a lead with contact, phone, email, and property address.
-2. **Telegram** — sends an instant notification to the owner's chat.
+1. **KV backup** — synchronously writes the raw payload to the `LEADS` KV
+   namespace with a 30-day TTL. This is the durability floor — even a total
+   downstream outage leaves a recoverable record.
+2. **Close CRM** — creates a lead with contact, phone, email, and property
+   address; returns the new lead ID.
+3. **Telegram** — instant notification to the owner's chat with a deep link
+   to the new Close lead.
+4. **GA4 (server-side)** — fires a `generate_lead` conversion via Measurement
+   Protocol, so attribution survives ad-blockers.
 
-Both fan-outs run inside `ctx.waitUntil(Promise.allSettled([...]))` so one
-service being down doesn't fail the response.
+Steps 2–4 run inside `ctx.waitUntil(Promise.allSettled([...]))` so any single
+service being down doesn't fail the response or block the others.
 
-## Local dev
+## One-time setup
 
 ```bash
 cd workers/lead-intake
 pnpm install
-pnpm dev
-```
 
-The worker shares `lib/leadSchema.ts` and `lib/hmac.ts` with the Next app via
-relative paths, so the schema cannot drift.
+# Create the KV namespace and paste the returned id into wrangler.toml
+wrangler kv:namespace create LEADS
+
+# Generate and store the HMAC secret (must match the Vercel env var)
+openssl rand -hex 32 | wrangler secret put LEAD_WORKER_HMAC_SECRET
+
+# Required secrets
+wrangler secret put CLOSE_API_KEY
+wrangler secret put TELEGRAM_BOT_TOKEN
+wrangler secret put TELEGRAM_OWNER_CHAT_ID
+wrangler secret put TURNSTILE_SECRET_KEY
+
+# Optional secrets
+wrangler secret put CLOSE_LEAD_PIPELINE_ID
+wrangler secret put CLOSE_OWNER_USER_ID
+wrangler secret put GA4_MEASUREMENT_ID
+wrangler secret put GA4_API_SECRET
+```
 
 ## Deploy
 
@@ -27,34 +48,34 @@ relative paths, so the schema cannot drift.
 pnpm deploy
 ```
 
-## Required secrets
+## Environment variables
 
-Set with `wrangler secret put NAME`:
+| Name | Required | Used for |
+|---|---|---|
+| `LEAD_WORKER_HMAC_SECRET` | yes | Verifies the signature from the Next.js Edge route. Must match the value in Vercel. |
+| `CLOSE_API_KEY` | yes | Close CRM API key. |
+| `CLOSE_LEAD_PIPELINE_ID` | no | Status ID to set new leads to. |
+| `CLOSE_OWNER_USER_ID` | no | User ID to attribute new leads to. |
+| `TELEGRAM_BOT_TOKEN` | yes | Bot token from `@BotFather`. |
+| `TELEGRAM_OWNER_CHAT_ID` | yes | Chat ID to send notifications to. |
+| `TURNSTILE_SECRET_KEY` | yes | Cloudflare Turnstile server-side secret. |
+| `GA4_MEASUREMENT_ID` | no | GA4 stream ID (`G-XXXX`). Without it, server-side events are skipped. |
+| `GA4_API_SECRET` | no | Created in GA4 → Admin → Data Streams → Measurement Protocol API secrets. |
 
-| Name | Used for |
-|---|---|
-| `LEAD_WORKER_HMAC_SECRET` | Verifies the signature from the Next.js Edge route. Must match the value the Next app uses. |
-| `CLOSE_API_KEY` | Close CRM API key (Personal API key or org-level integration). |
-| `CLOSE_LEAD_PIPELINE_ID` | Optional. Status ID to set new leads to. |
-| `CLOSE_OWNER_USER_ID` | Optional. User ID to attribute new leads to. |
-| `TELEGRAM_BOT_TOKEN` | Bot token from `@BotFather`. |
-| `TELEGRAM_OWNER_CHAT_ID` | Chat ID to send notifications to. Get yours by DMing the bot, then hitting `https://api.telegram.org/bot<TOKEN>/getUpdates`. |
-| `TURNSTILE_SECRET_KEY` | Cloudflare Turnstile server-side secret. |
+## KV namespace
 
-## Generating an HMAC secret
+The `LEADS` namespace stores two key types per lead:
 
-Use a long random value:
+- `lead:{id}` — the raw signed payload, 30-day TTL. Replay source.
+- `status:{id}` — `{ closeLeadId, ts }` written after fan-out. If this key is
+  missing for a `lead:{id}`, fan-out failed and the lead is replayable.
 
-```bash
-openssl rand -hex 32
-```
+You can list keys with `wrangler kv:key list --binding=LEADS` and inspect a
+specific one with `wrangler kv:key get lead:abcd1234 --binding=LEADS`.
 
-Set it identically in both places:
+## Replaying a failed lead
 
-```bash
-# Worker
-wrangler secret put LEAD_WORKER_HMAC_SECRET
-
-# Vercel (Next.js app)
-vercel env add LEAD_WORKER_HMAC_SECRET
-```
+If Close or Telegram was down when a lead came in, you can re-run fan-out by
+re-POSTing the stored payload back through the Next.js Edge route — the
+signature is verified against the same secret, so a stored payload remains
+valid as long as the secret hasn't rotated.

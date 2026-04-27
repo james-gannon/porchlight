@@ -3,6 +3,13 @@ import { Fraunces, Inter } from "next/font/google";
 import { Header } from "@/components/layout/Header";
 import { Footer } from "@/components/layout/Footer";
 import { MobileStickyCTA } from "@/components/layout/MobileStickyCTA";
+import { JsonLd } from "@/components/seo/JsonLd";
+import {
+  buildOrganization,
+  buildRootLocalBusiness,
+  buildWebsite,
+  composeGraph,
+} from "@/lib/schema";
 import { site } from "@/content/site";
 import "./globals.css";
 
@@ -43,9 +50,16 @@ export const viewport: Viewport = {
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
+  const rootGraph = composeGraph(
+    buildOrganization(),
+    buildWebsite(),
+    buildRootLocalBusiness(),
+  );
+
   return (
     <html lang="en" className={`${fraunces.variable} ${inter.variable}`}>
       <body className="font-sans pb-[72px] md:pb-0">
+        <JsonLd data={rootGraph} />
         <Header />
         <main id="main">{children}</main>
         <Footer />

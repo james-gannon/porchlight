@@ -2,13 +2,18 @@
  * PorchLight lead-intake Worker.
  *
  * Receives signed payloads from the Next.js Edge route at `/api/lead`,
- * verifies HMAC + Turnstile, then fans out to:
- *   1. Close CRM (creates a lead with contact + opportunity)
- *   2. Telegram (instant notification to the owner)
+ * verifies HMAC + Turnstile, writes a durable backup to KV, then fans out:
  *
- * Both fan-outs run with `Promise.allSettled` so a Telegram outage doesn't
- * block Close, and vice versa. Errors are surfaced to Workers logs but the
- * client always sees a generic success response if the payload was valid.
+ *   1. Close CRM           — creates a lead with contact + property address
+ *   2. Telegram            — instant notification to the owner with a deep
+ *                            link back to the new Close lead
+ *   3. GA4 (server-side)   — fires a `generate_lead` conversion event via the
+ *                            Measurement Protocol so attribution survives
+ *                            ad-blockers
+ *
+ * KV write happens FIRST and synchronously, so even a total fan-out failure
+ * leaves a recoverable record. Fan-out runs inside ctx.waitUntil with
+ * Promise.allSettled so any single dependency being down can't cascade.
  */
 
 import { leadSchema, quickOfferSchema, type Lead, type QuickOffer } from "../../../lib/leadSchema";
@@ -16,12 +21,15 @@ import { hmacSha256Hex, timingSafeEqualHex } from "../../../lib/hmac";
 
 export interface Env {
   LEAD_WORKER_HMAC_SECRET: string;
+  LEADS?: KVNamespace;
   CLOSE_API_KEY?: string;
   CLOSE_LEAD_PIPELINE_ID?: string;
   CLOSE_OWNER_USER_ID?: string;
   TELEGRAM_BOT_TOKEN?: string;
   TELEGRAM_OWNER_CHAT_ID?: string;
   TURNSTILE_SECRET_KEY?: string;
+  GA4_MEASUREMENT_ID?: string;
+  GA4_API_SECRET?: string;
 }
 
 type IntakeEnvelope =
@@ -62,7 +70,6 @@ export default {
       return json(422, { error: "Validation failed" });
     }
 
-    // Verify Turnstile if a token is present and a secret is configured.
     if (envelope.data.turnstileToken && env.TURNSTILE_SECRET_KEY) {
       const ok = await verifyTurnstile(
         env.TURNSTILE_SECRET_KEY,
@@ -75,33 +82,74 @@ export default {
       }
     }
 
-    // Fan out — don't block the response on these.
+    const leadId = await generateLeadId(envelope);
+
+    // 1. Durable backup — synchronous so the response can't return ok if the
+    //    backup didn't land. 30-day TTL gives plenty of room to replay if both
+    //    Close and Telegram were down.
+    if (env.LEADS) {
+      try {
+        await env.LEADS.put(`lead:${leadId}`, raw, { expirationTtl: 60 * 60 * 24 * 30 });
+      } catch (err) {
+        console.error("[worker] kv backup failed:", err);
+        return json(503, { error: "Lead backup failed; please try again." });
+      }
+    } else {
+      console.warn("[worker] LEADS KV namespace not bound; skipping backup");
+    }
+
+    // 2. Fan out — never block the response. Each handler swallows its own
+    //    errors so one outage can't cascade into another.
     ctx.waitUntil(
-      Promise.allSettled([
-        sendToClose(env, envelope).catch((e) => console.error("[worker] close error", e)),
-        sendToTelegram(env, envelope).catch((e) =>
-          console.error("[worker] telegram error", e),
-        ),
-      ]).then(() => undefined),
+      (async () => {
+        const closePromise = sendToClose(env, envelope).catch((e) => {
+          console.error("[worker] close error", e);
+          return null;
+        });
+        const closeLeadId = await closePromise;
+        await Promise.allSettled([
+          sendToTelegram(env, envelope, closeLeadId).catch((e) =>
+            console.error("[worker] telegram error", e),
+          ),
+          sendGa4Event(env, envelope, leadId).catch((e) =>
+            console.error("[worker] ga4 error", e),
+          ),
+          // Mark KV record as fanned out so we know which IDs need replay.
+          env.LEADS?.put(`status:${leadId}`, JSON.stringify({ closeLeadId, ts: Date.now() }), {
+            expirationTtl: 60 * 60 * 24 * 30,
+          }).catch((e) => console.error("[worker] kv status error", e)),
+        ]);
+      })(),
     );
 
-    return json(200, { ok: true });
+    return json(200, { ok: true, leadId });
   },
 };
 
+// --- Lead ID ---
+
+async function generateLeadId(envelope: IntakeEnvelope): Promise<string> {
+  const enc = new TextEncoder();
+  const seed = `${envelope.receivedAt}:${envelope.data.propertyAddress}:${envelope.data.phone}`;
+  const buf = await crypto.subtle.digest("SHA-256", enc.encode(seed));
+  return Array.from(new Uint8Array(buf))
+    .slice(0, 8)
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+}
+
 // --- Close CRM ---
 
-async function sendToClose(env: Env, envelope: IntakeEnvelope): Promise<void> {
+async function sendToClose(env: Env, envelope: IntakeEnvelope): Promise<string | null> {
   if (!env.CLOSE_API_KEY) {
     console.warn("[worker] CLOSE_API_KEY not set; skipping Close push");
-    return;
+    return null;
   }
 
   const auth = `Basic ${btoa(`${env.CLOSE_API_KEY}:`)}`;
   const data = envelope.data;
   const isFull = envelope.kind === "full";
 
-  // Compose lead name: "Last, First — 123 Main St" (full) or "Quick — 123 Main St"
   const name = isFull
     ? `${(data as Lead).lastName}, ${(data as Lead).firstName} — ${data.propertyAddress}`
     : `Quick lead — ${data.propertyAddress}`;
@@ -114,8 +162,6 @@ async function sendToClose(env: Env, envelope: IntakeEnvelope): Promise<void> {
   const emails = isFull ? [{ email: (data as Lead).email, type: "office" }] : [];
 
   const description = buildLeadDescription(envelope);
-
-  const customFields = isFull ? buildCloseCustomFields(envelope) : {};
 
   const body: Record<string, unknown> = {
     name,
@@ -133,7 +179,6 @@ async function sendToClose(env: Env, envelope: IntakeEnvelope): Promise<void> {
           },
         ]
       : [{ label: "property", address_1: data.propertyAddress, country: "US" }],
-    ...customFields,
   };
 
   if (env.CLOSE_LEAD_PIPELINE_ID) body.status_id = env.CLOSE_LEAD_PIPELINE_ID;
@@ -152,6 +197,8 @@ async function sendToClose(env: Env, envelope: IntakeEnvelope): Promise<void> {
     const text = await res.text().catch(() => "");
     throw new Error(`Close ${res.status}: ${text.slice(0, 500)}`);
   }
+  const created = (await res.json().catch(() => null)) as { id?: string } | null;
+  return created?.id ?? null;
 }
 
 function buildLeadDescription(envelope: IntakeEnvelope): string {
@@ -178,23 +225,19 @@ function buildLeadDescription(envelope: IntakeEnvelope): string {
   return lines.join("\n");
 }
 
-function buildCloseCustomFields(envelope: IntakeEnvelope): Record<string, unknown> {
-  // Close uses `custom.<field-id>` keys — leave keys unset until the user
-  // creates the corresponding fields in their Close instance and sets the IDs.
-  // Returning an empty object means we skip custom fields cleanly.
-  void envelope;
-  return {};
-}
-
 // --- Telegram ---
 
-async function sendToTelegram(env: Env, envelope: IntakeEnvelope): Promise<void> {
+async function sendToTelegram(
+  env: Env,
+  envelope: IntakeEnvelope,
+  closeLeadId: string | null,
+): Promise<void> {
   if (!env.TELEGRAM_BOT_TOKEN || !env.TELEGRAM_OWNER_CHAT_ID) {
     console.warn("[worker] Telegram not configured; skipping notification");
     return;
   }
 
-  const text = formatTelegramMessage(envelope);
+  const text = formatTelegramMessage(envelope, closeLeadId);
   const res = await fetch(`https://api.telegram.org/bot${env.TELEGRAM_BOT_TOKEN}/sendMessage`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -212,17 +255,22 @@ async function sendToTelegram(env: Env, envelope: IntakeEnvelope): Promise<void>
   }
 }
 
-function formatTelegramMessage(envelope: IntakeEnvelope): string {
+function formatTelegramMessage(envelope: IntakeEnvelope, closeLeadId: string | null): string {
   const d = envelope.data;
+  const closeLine = closeLeadId
+    ? `\nOpen in Close: https://app.close.com/lead/${closeLeadId}/`
+    : "";
+
   if (envelope.kind === "quick") {
     const q = d as QuickOffer;
     return [
-      "*New quick lead* :sparkles:",
+      "*New quick lead* ⚡",
       `*Address:* ${escape(q.propertyAddress)}`,
       `*Phone:* ${escape(q.phone)}`,
       q.firstName ? `*Name:* ${escape(q.firstName)}` : null,
       `*Source:* ${escape(q.source ?? "(unknown)")}`,
       `*Page:* ${escape(q.pagePath ?? "(unknown)")}`,
+      closeLine || null,
     ]
       .filter(Boolean)
       .join("\n");
@@ -237,14 +285,62 @@ function formatTelegramMessage(envelope: IntakeEnvelope): string {
     `Situation: ${f.situation} · Timeline: ${f.timeline}`,
     f.notes ? `\n_${escape(f.notes.slice(0, 300))}_` : null,
     `\nSource: ${escape(f.source ?? "(unknown)")} · Page: ${escape(f.pagePath ?? "(unknown)")}`,
+    closeLine || null,
   ]
     .filter(Boolean)
     .join("\n");
 }
 
-// Markdown special chars that Telegram cares about. Escape conservatively.
 function escape(s: string): string {
   return s.replace(/[*_`[\]()]/g, (m) => `\\${m}`);
+}
+
+// --- GA4 server-side ---
+
+async function sendGa4Event(
+  env: Env,
+  envelope: IntakeEnvelope,
+  leadId: string,
+): Promise<void> {
+  if (!env.GA4_MEASUREMENT_ID || !env.GA4_API_SECRET) return;
+
+  // GA4 Measurement Protocol expects a stable client_id. We don't have access
+  // to the browser's `_ga` cookie from the Worker, so we synthesize a stable
+  // pseudo client_id from the lead ID. This trades cross-device join for
+  // guaranteed conversion delivery — the right call when the choice is between
+  // "no event" and "an event with a synthetic client_id."
+  const clientId = `lead.${leadId}`;
+  const data = envelope.data;
+
+  const url = `https://www.google-analytics.com/mp/collect?measurement_id=${encodeURIComponent(
+    env.GA4_MEASUREMENT_ID,
+  )}&api_secret=${encodeURIComponent(env.GA4_API_SECRET)}`;
+
+  const res = await fetch(url, {
+    method: "POST",
+    body: JSON.stringify({
+      client_id: clientId,
+      non_personalized_ads: false,
+      events: [
+        {
+          name: "generate_lead",
+          params: {
+            engagement_time_msec: 1,
+            lead_kind: envelope.kind,
+            source: data.source ?? "(unknown)",
+            page_path: data.pagePath ?? "(unknown)",
+            value: 1,
+            currency: "USD",
+          },
+        },
+      ],
+    }),
+  });
+
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    throw new Error(`GA4 ${res.status}: ${body.slice(0, 200)}`);
+  }
 }
 
 // --- Turnstile ---

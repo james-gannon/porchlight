@@ -1,12 +1,9 @@
+import Link from "next/link";
+import { ArrowRight } from "lucide-react";
 import { Container, Eyebrow } from "@/components/ui/Container";
-import { site } from "@/content/site";
-
-const groups: ReadonlyArray<{ heading: string; cities: ReadonlyArray<string> }> = [
-  { heading: "Rhode Island", cities: site.serviceAreas.ri },
-  { heading: "Bristol County, MA", cities: site.serviceAreas.bristolMa },
-  { heading: "Plymouth County, MA", cities: site.serviceAreas.plymouthMa },
-  { heading: "Norfolk County, MA", cities: site.serviceAreas.norfolkMa },
-];
+import { counties } from "@/content/counties";
+import { citiesByCounty } from "@/content/cities";
+import { cityUrl, countyUrl } from "@/lib/content";
 
 export function ServiceArea() {
   return (
@@ -27,21 +24,40 @@ export function ServiceArea() {
         </div>
 
         <div className="mt-10 grid gap-8 md:grid-cols-4">
-          {groups.map((g) => (
-            <div key={g.heading}>
-              <p className="font-display text-base font-semibold text-ink">{g.heading}</p>
-              <ul className="mt-3 space-y-1.5 font-sans text-sm text-ink-muted">
-                {g.cities.map((city) => (
-                  <li key={city}>{city}</li>
-                ))}
-              </ul>
-            </div>
-          ))}
+          {counties.map((county) => {
+            const cities = citiesByCounty(county.slug);
+            return (
+              <div key={county.slug}>
+                <Link
+                  href={countyUrl(county.slug)}
+                  className="group inline-flex items-center gap-1 font-display text-base font-semibold text-ink hover:text-amber-deep"
+                >
+                  {county.displayName}
+                  <ArrowRight
+                    className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5"
+                    aria-hidden
+                  />
+                </Link>
+                <ul className="mt-3 space-y-1.5 font-sans text-sm">
+                  {cities.map((c) => (
+                    <li key={c.slug}>
+                      <Link href={cityUrl(c.slug)} className="text-ink-muted hover:text-amber-deep">
+                        {c.name}
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            );
+          })}
         </div>
 
         <p className="mt-8 font-sans text-sm text-ink-muted">
-          Don&rsquo;t see your town? Call us — we cover most of the area and can usually still
-          help.
+          Don&rsquo;t see your town?{" "}
+          <Link href="/contact" className="underline hover:text-amber-deep">
+            Call us
+          </Link>{" "}
+          — we cover most of the area and can usually still help.
         </p>
       </Container>
     </section>

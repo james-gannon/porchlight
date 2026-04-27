@@ -6,11 +6,22 @@ compatibility_flags = ["nodejs_compat"]
 # Set with `wrangler secret put` — never check secrets into git.
 #   LEAD_WORKER_HMAC_SECRET   shared with the Next.js Edge route
 #   CLOSE_API_KEY             Close CRM API key
-#   CLOSE_LEAD_PIPELINE_ID    Close pipeline (optional)
+#   CLOSE_LEAD_PIPELINE_ID    Close pipeline status id (optional)
 #   CLOSE_OWNER_USER_ID       Close user to assign new leads to (optional)
 #   TELEGRAM_BOT_TOKEN        bot token from @BotFather
 #   TELEGRAM_OWNER_CHAT_ID    chat id to ping for new leads
 #   TURNSTILE_SECRET_KEY      Cloudflare Turnstile server-side secret
+#   GA4_MEASUREMENT_ID        e.g. "G-XXXXXXX"  (optional — server-side conversion)
+#   GA4_API_SECRET            from GA4 Data Stream → Measurement Protocol API secrets
+
+# Durable backup of every lead we receive. The Worker writes here BEFORE any
+# fan-out so even a total Close + Telegram outage doesn't lose a lead.
+# Create the namespace once with:
+#   wrangler kv:namespace create LEADS
+# Then paste the returned id below.
+[[kv_namespaces]]
+binding = "LEADS"
+id = "TO_FILL_KV_NAMESPACE_ID"
 
 [observability]
 enabled = true

@@ -1,20 +1,18 @@
 import Link from "next/link";
 import { site } from "@/content/site";
+import { counties } from "@/content/counties";
+import { citiesByCounty } from "@/content/cities";
+import { propertyTypes } from "@/content/propertyTypes";
+import { cityUrl, countyUrl, propertyTypeUrl } from "@/lib/content";
 
 export function Footer() {
   const year = new Date().getFullYear();
-  const allCities = [
-    ...site.serviceAreas.ri,
-    ...site.serviceAreas.bristolMa,
-    ...site.serviceAreas.plymouthMa,
-    ...site.serviceAreas.norfolkMa,
-  ];
 
   return (
     <footer className="border-t border-rule/10 bg-paper-2/60">
       <div className="container py-12">
-        <div className="grid gap-10 md:grid-cols-4">
-          <div className="md:col-span-2">
+        <div className="grid gap-10 md:grid-cols-12">
+          <div className="md:col-span-4">
             <p className="font-display text-2xl font-semibold">{site.name}</p>
             <p className="mt-2 max-w-md text-sm text-ink-muted">{site.tagline}</p>
             <p className="mt-6 text-sm text-ink-muted">
@@ -31,7 +29,7 @@ export function Footer() {
             </p>
           </div>
 
-          <div>
+          <div className="md:col-span-2">
             <p className="font-display text-sm font-semibold uppercase tracking-wider text-ink-muted">
               Company
             </p>
@@ -64,14 +62,48 @@ export function Footer() {
             </ul>
           </div>
 
-          <div>
+          <div className="md:col-span-3">
+            <p className="font-display text-sm font-semibold uppercase tracking-wider text-ink-muted">
+              Situations
+            </p>
+            <ul className="mt-3 space-y-2 text-sm">
+              {propertyTypes.map((p) => (
+                <li key={p.slug}>
+                  <Link href={propertyTypeUrl(p.slug)} className="hover:text-amber-deep">
+                    {p.name}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          <div className="md:col-span-3">
             <p className="font-display text-sm font-semibold uppercase tracking-wider text-ink-muted">
               Service area
             </p>
-            <ul className="mt-3 grid grid-cols-2 gap-x-3 gap-y-1.5 text-sm text-ink-muted">
-              {allCities.map((city) => (
-                <li key={city}>{city}</li>
-              ))}
+            <ul className="mt-3 space-y-3 text-sm">
+              {counties.map((c) => {
+                const cs = citiesByCounty(c.slug);
+                return (
+                  <li key={c.slug}>
+                    <Link
+                      href={countyUrl(c.slug)}
+                      className="font-medium text-ink hover:text-amber-deep"
+                    >
+                      {c.displayName}
+                    </Link>
+                    <ul className="mt-1 flex flex-wrap gap-x-2 gap-y-0.5 text-xs text-ink-muted">
+                      {cs.map((city) => (
+                        <li key={city.slug}>
+                          <Link href={cityUrl(city.slug)} className="hover:text-amber-deep">
+                            {city.name}
+                          </Link>
+                        </li>
+                      ))}
+                    </ul>
+                  </li>
+                );
+              })}
             </ul>
           </div>
         </div>
