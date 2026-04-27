@@ -1,0 +1,63 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Brand tokens — single source of truth.
+   RGB triplets so Tailwind's <alpha-value> works. */
+@layer base {
+  :root {
+    --paper: 244 239 228;       /* #F4EFE4 */
+    --cream-2: 234 227 210;     /* #EAE3D2 */
+    --ink: 15 15 15;            /* #0F0F0F */
+    --ink-muted: 58 58 58;      /* #3A3A3A */
+    --amber: 232 163 58;        /* #E8A33A */
+    --amber-deep: 200 130 30;   /* #C8821E */
+    --moss: 58 74 58;           /* #3A4A3A */
+    --rule: 31 31 31;           /* used at low alpha */
+  }
+
+  html {
+    color-scheme: light;
+  }
+
+  body {
+    @apply bg-paper text-ink antialiased;
+    font-feature-settings: "ss01", "ss02";
+  }
+
+  ::selection {
+    background: rgb(var(--amber) / 0.35);
+  }
+
+  *:focus-visible {
+    @apply outline-none ring-2 ring-amber-deep ring-offset-2 ring-offset-paper;
+  }
+
+  h1, h2, h3 {
+    @apply font-display tracking-tight text-ink;
+  }
+  h1 { @apply text-4xl md:text-6xl leading-[1.05]; }
+  h2 { @apply text-3xl md:text-4xl leading-tight; }
+  h3 { @apply text-xl md:text-2xl leading-snug; }
+
+  hr { @apply border-rule/15; }
+}
+
+@layer components {
+  .btn-primary {
+    @apply inline-flex items-center justify-center rounded-md bg-amber px-5 py-3 font-sans
+           font-semibold text-ink shadow-lantern transition-all
+           hover:bg-amber-deep hover:text-paper focus-visible:ring-amber-deep;
+  }
+  .btn-ghost {
+    @apply inline-flex items-center justify-center rounded-md border border-ink/15 bg-transparent
+           px-5 py-3 font-sans font-medium text-ink transition-colors hover:bg-ink/5;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    transition-duration: 0.001ms !important;
+  }
+}
