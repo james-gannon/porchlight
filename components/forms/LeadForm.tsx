@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { ArrowRight, CheckCircle2, Loader2 } from "lucide-react";
+import { ArrowRight, Loader2 } from "lucide-react";
 import {
   CONDITION_LABELS,
   CONDITIONS,
@@ -36,10 +37,10 @@ type Props = {
 type SubmitState =
   | { kind: "idle" }
   | { kind: "submitting" }
-  | { kind: "success" }
   | { kind: "error"; message: string };
 
 export function LeadForm({ source = "lead-form", defaults, compact = false }: Props) {
+  const router = useRouter();
   const [state, setState] = useState<SubmitState>({ kind: "idle" });
   const [turnstileToken, setTurnstileToken] = useState<string | undefined>();
 
@@ -91,7 +92,7 @@ export function LeadForm({ source = "lead-form", defaults, compact = false }: Pr
         const body = (await res.json().catch(() => ({}))) as { error?: string };
         throw new Error(body.error ?? "Something went wrong on our end.");
       }
-      setState({ kind: "success" });
+      router.push("/thank-you");
     } catch (err) {
       setState({
         kind: "error",
@@ -102,19 +103,6 @@ export function LeadForm({ source = "lead-form", defaults, compact = false }: Pr
       });
     }
   };
-
-  if (state.kind === "success") {
-    return (
-      <div className="rounded-lg border border-amber/30 bg-paper p-6 text-center md:p-8">
-        <CheckCircle2 className="mx-auto h-10 w-10 text-amber-deep" aria-hidden />
-        <h3 className="mt-3 font-display text-2xl text-ink">Got it — thank you.</h3>
-        <p className="mt-2 font-sans text-sm text-ink-muted">
-          We&rsquo;ll review the details and call you within one business day, usually faster.
-          If you&rsquo;d rather not wait, you can call us directly any time.
-        </p>
-      </div>
-    );
-  }
 
   const disabled = isSubmitting || state.kind === "submitting";
 

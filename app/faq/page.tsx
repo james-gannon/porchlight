@@ -2,6 +2,14 @@ import type { Metadata } from "next";
 import { Container, Eyebrow } from "@/components/ui/Container";
 import { FAQ } from "@/components/sections/FAQ";
 import { CtaBand } from "@/components/sections/CtaBand";
+import { JsonLd } from "@/components/seo/JsonLd";
+import {
+  breadcrumbHome,
+  buildBreadcrumb,
+  buildFaqPage,
+  composeGraph,
+} from "@/lib/schema";
+import { faqs } from "@/content/site";
 
 export const metadata: Metadata = {
   title: "FAQ — selling your house for cash in RI & MA",
@@ -11,8 +19,14 @@ export const metadata: Metadata = {
 };
 
 export default function FAQPage() {
+  const graph = composeGraph(
+    buildFaqPage(faqs),
+    buildBreadcrumb([breadcrumbHome, { name: "FAQ", url: "/faq" }]),
+  );
+
   return (
     <>
+      <JsonLd data={graph} />
       <section className="border-b border-rule/10 bg-paper-2/40">
         <Container className="max-w-3xl py-16 md:py-24">
           <Eyebrow>FAQ</Eyebrow>

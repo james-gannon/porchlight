@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { ArrowRight, CheckCircle2, Loader2 } from "lucide-react";
+import { ArrowRight, Loader2 } from "lucide-react";
 import { quickOfferSchema, type QuickOfferInput } from "@/lib/leadSchema";
 import { Field } from "@/components/ui/Field";
 import { Input } from "@/components/ui/Input";
@@ -17,7 +18,7 @@ type Props = {
 };
 
 export function QuickOfferForm({ source = "quick-offer", variant = "card" }: Props) {
-  const [submitted, setSubmitted] = useState(false);
+  const router = useRouter();
   const [error, setError] = useState<string | undefined>();
   const [turnstileToken, setTurnstileToken] = useState<string | undefined>();
 
@@ -55,7 +56,7 @@ export function QuickOfferForm({ source = "quick-offer", variant = "card" }: Pro
         const body = (await res.json().catch(() => ({}))) as { error?: string };
         throw new Error(body.error ?? "Something went wrong on our end.");
       }
-      setSubmitted(true);
+      router.push("/thank-you");
     } catch (err) {
       setError(
         err instanceof Error
@@ -64,18 +65,6 @@ export function QuickOfferForm({ source = "quick-offer", variant = "card" }: Pro
       );
     }
   };
-
-  if (submitted) {
-    return (
-      <div className="rounded-lg border border-amber/30 bg-paper p-5 text-center">
-        <CheckCircle2 className="mx-auto h-8 w-8 text-amber-deep" aria-hidden />
-        <p className="mt-2 font-display text-lg text-ink">Thanks — we&rsquo;ll be in touch shortly.</p>
-        <p className="mt-1 font-sans text-sm text-ink-muted">
-          Usually within an hour during business hours.
-        </p>
-      </div>
-    );
-  }
 
   const inline = variant === "inline";
 
