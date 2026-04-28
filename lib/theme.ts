@@ -14,7 +14,17 @@
  * bundle.
  */
 
-export const THEMES = ["lantern", "letter", "direct", "field-notes"] as const;
+export const THEMES = [
+  "lantern",
+  "letter",
+  "direct",
+  "field-notes",
+  "backyard",
+  "documentary",
+  "receipts",
+  "almanac",
+  "gazette",
+] as const;
 export type Theme = (typeof THEMES)[number];
 
 export const THEME_LABELS: Record<Theme, string> = {
@@ -22,6 +32,11 @@ export const THEME_LABELS: Record<Theme, string> = {
   letter: "Letter",
   direct: "Direct",
   "field-notes": "Field Notes",
+  backyard: "Backyard",
+  documentary: "Documentary",
+  receipts: "Receipts",
+  almanac: "Almanac",
+  gazette: "Gazette",
 };
 
 export const THEME_DESCRIPTIONS: Record<Theme, string> = {
@@ -29,6 +44,11 @@ export const THEME_DESCRIPTIONS: Record<Theme, string> = {
   letter: "Editorial / longform. Owner-led. Magazine feel.",
   direct: "Bold direct-response. Conversion-first. High contrast.",
   "field-notes": "Polaroid / scrapbook. Maximum personality.",
+  backyard: "Text thread first. Voicemails, postcards, real conversation.",
+  documentary: "Dark cinematic. B&W photography. Like an Atlantic feature.",
+  receipts: "Radical transparency. Letterpress + monospace. Real numbers.",
+  almanac: "Field-guide aesthetic. Encyclopedic. Old Farmers' Almanac feel.",
+  gazette: "Local newspaper. Masthead, columns, classifieds.",
 };
 
 export const THEME_COOKIE = "pl-home-theme";
