@@ -4,6 +4,7 @@ import { Header } from "@/components/layout/Header";
 import { Footer } from "@/components/layout/Footer";
 import { MobileStickyCTA } from "@/components/layout/MobileStickyCTA";
 import { JsonLd } from "@/components/seo/JsonLd";
+import { ThemeSwitcher } from "@/components/dev/ThemeSwitcher";
 import {
   buildOrganization,
   buildRootLocalBusiness,
@@ -64,6 +65,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <main id="main">{children}</main>
         <Footer />
         <MobileStickyCTA />
+        {/* THEME_DEV_TOOL — remove before launch. */}
+        <ThemeSwitcher />
       </body>
     </html>
   );

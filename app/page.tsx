@@ -1,14 +1,9 @@
 import type { Metadata } from "next";
-import { Hero } from "@/components/sections/Hero";
-import { TrustBar } from "@/components/sections/TrustBar";
-import { ProcessSteps } from "@/components/sections/ProcessSteps";
-import { ComparisonTable } from "@/components/sections/ComparisonTable";
-import { SellReasons } from "@/components/sections/SellReasons";
-import { Testimonials } from "@/components/sections/Testimonials";
-import { ServiceArea } from "@/components/sections/ServiceArea";
-import { OwnerStory } from "@/components/sections/OwnerStory";
-import { FAQ } from "@/components/sections/FAQ";
-import { CtaBand } from "@/components/sections/CtaBand";
+import { LanternHome } from "@/components/themes/lantern/Home";
+import { LetterHome } from "@/components/themes/letter/Home";
+import { DirectHome } from "@/components/themes/direct/Home";
+import { FieldNotesHome } from "@/components/themes/fieldnotes/Home";
+import { getActiveTheme } from "@/lib/theme.server";
 import { site } from "@/content/site";
 
 export const metadata: Metadata = {
@@ -18,19 +13,22 @@ export const metadata: Metadata = {
   alternates: { canonical: "/" },
 };
 
+// THEME_DEV_TOOL — the cookie read makes this route dynamic. Before launch,
+// pin a single theme and re-enable static rendering by removing the cookie
+// read and the ThemeSwitcher in app/layout.tsx.
+export const dynamic = "force-dynamic";
+
 export default function HomePage() {
-  return (
-    <>
-      <Hero />
-      <TrustBar />
-      <ProcessSteps />
-      <ComparisonTable />
-      <SellReasons />
-      <Testimonials />
-      <ServiceArea />
-      <OwnerStory />
-      <FAQ limit={6} />
-      <CtaBand />
-    </>
-  );
+  const theme = getActiveTheme();
+  switch (theme) {
+    case "letter":
+      return <LetterHome />;
+    case "direct":
+      return <DirectHome />;
+    case "field-notes":
+      return <FieldNotesHome />;
+    case "lantern":
+    default:
+      return <LanternHome />;
+  }
 }
