@@ -3,6 +3,11 @@ import { LanternHome } from "@/components/themes/lantern/Home";
 import { LetterHome } from "@/components/themes/letter/Home";
 import { DirectHome } from "@/components/themes/direct/Home";
 import { FieldNotesHome } from "@/components/themes/fieldnotes/Home";
+import { BackyardHome } from "@/components/themes/backyard/Home";
+import { DocumentaryHome } from "@/components/themes/documentary/Home";
+import { ReceiptsHome } from "@/components/themes/receipts/Home";
+import { AlmanacHome } from "@/components/themes/almanac/Home";
+import { GazetteHome } from "@/components/themes/gazette/Home";
 import { getActiveTheme } from "@/lib/theme.server";
 import { site } from "@/content/site";
 
@@ -27,6 +32,16 @@ export default function HomePage() {
       return <DirectHome />;
     case "field-notes":
       return <FieldNotesHome />;
+    case "backyard":
+      return <BackyardHome />;
+    case "documentary":
+      return <DocumentaryHome />;
+    case "receipts":
+      return <ReceiptsHome />;
+    case "almanac":
+      return <AlmanacHome />;
+    case "gazette":
+      return <GazetteHome />;
     case "lantern":
     default:
       return <LanternHome />;
