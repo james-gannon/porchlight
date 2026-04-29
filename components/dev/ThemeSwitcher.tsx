@@ -121,7 +121,7 @@ export function ThemeSwitcher() {
       </button>
 
       {open ? (
-        <ul className="border-t border-rule/10 py-1">
+        <ul className="max-h-[60vh] overflow-y-auto overscroll-contain border-t border-rule/10 py-1">
           {THEMES.map((t) => (
             <li key={t}>
               <button
