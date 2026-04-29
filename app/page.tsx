@@ -8,6 +8,11 @@ import { DocumentaryHome } from "@/components/themes/documentary/Home";
 import { ReceiptsHome } from "@/components/themes/receipts/Home";
 import { AlmanacHome } from "@/components/themes/almanac/Home";
 import { GazetteHome } from "@/components/themes/gazette/Home";
+import { BackporchHome } from "@/components/themes/backporch/Home";
+import { DocksideHome } from "@/components/themes/dockside/Home";
+import { HearthHome } from "@/components/themes/hearth/Home";
+import { SteadyHome } from "@/components/themes/steady/Home";
+import { FirstLightHome } from "@/components/themes/first-light/Home";
 import { getActiveTheme } from "@/lib/theme.server";
 import { site } from "@/content/site";
 
@@ -42,6 +47,16 @@ export default function HomePage() {
       return <AlmanacHome />;
     case "gazette":
       return <GazetteHome />;
+    case "backporch":
+      return <BackporchHome />;
+    case "dockside":
+      return <DocksideHome />;
+    case "hearth":
+      return <HearthHome />;
+    case "steady":
+      return <SteadyHome />;
+    case "first-light":
+      return <FirstLightHome />;
     case "lantern":
     default:
       return <LanternHome />;

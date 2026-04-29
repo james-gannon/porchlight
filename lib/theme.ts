@@ -24,6 +24,11 @@ export const THEMES = [
   "receipts",
   "almanac",
   "gazette",
+  "backporch",
+  "dockside",
+  "hearth",
+  "steady",
+  "first-light",
 ] as const;
 export type Theme = (typeof THEMES)[number];
 
@@ -37,6 +42,11 @@ export const THEME_LABELS: Record<Theme, string> = {
   receipts: "Receipts",
   almanac: "Almanac",
   gazette: "Gazette",
+  backporch: "Backporch",
+  dockside: "Dockside",
+  hearth: "Hearth",
+  steady: "Steady",
+  "first-light": "First Light",
 };
 
 export const THEME_DESCRIPTIONS: Record<Theme, string> = {
@@ -49,6 +59,11 @@ export const THEME_DESCRIPTIONS: Record<Theme, string> = {
   receipts: "Radical transparency. Letterpress + monospace. Real numbers.",
   almanac: "Field-guide aesthetic. Encyclopedic. Old Farmers' Almanac feel.",
   gazette: "Local newspaper. Masthead, columns, classifieds.",
+  backporch: "Sage + cream. James-led, text threads, foreclosure first.",
+  dockside: "Coastal navy + sand. South Coast neighbor.",
+  hearth: "Rust + mustard + parchment. Yankee-magazine cozy.",
+  steady: "Workshop blue + leather. Blue-collar, built on handshakes.",
+  "first-light": "Dawn peach + sage. Soft, hopeful. We bring light.",
 };
 
 export const THEME_COOKIE = "pl-home-theme";
